@@ -19,8 +19,8 @@ export class TasksService {
   create(createTaskDto: CreateTaskDto) {
     
     if(createTaskDto.title !== undefined){
-      if(typeof createTaskDto.title !== 'string' || createTaskDto.title.trim().length < 1 || createTaskDto.title.trim().length > 100){
-        throw new BadRequestException('Title is a string and > 1 < 100')
+      if(typeof createTaskDto.title !== 'string' ){
+        throw new BadRequestException('Title is a string and >= 1 <= 100')
       }
 
       if(typeof createTaskDto.completed !== 'boolean'){
