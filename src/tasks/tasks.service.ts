@@ -7,8 +7,9 @@ import { GetTasksQueryDto } from './dto/query-task.dto';
 @Injectable()
 export class TasksService { 
   //Suport function
-  find_Duplicate(taskdto){
-    return tasks.find(task=>task.title.trim().toLowerCase() === taskdto.title?.trim().toLowerCase())
+  find_Duplicate(taskdto,id){
+    const result = tasks.filter(task=> task.deletedAt == null && task.id !== id )
+    return result.find(task=>task.title.trim().toLowerCase() === taskdto.title?.trim().toLowerCase())
   }
 
   find_ID(id){
@@ -19,14 +20,7 @@ export class TasksService {
   create(createTaskDto: CreateTaskDto) {
     
     if(createTaskDto.title !== undefined){
-      if(typeof createTaskDto.title !== 'string' || createTaskDto.title.trim().length < 1 || createTaskDto.title.trim().length > 100){
-        throw new BadRequestException('Title is a string and > 1 < 100')
-      }
-
-      if(typeof createTaskDto.completed !== 'boolean'){
-        throw new BadRequestException('Completed must be boolean')
-      }
-      const duplicate = this.find_Duplicate(createTaskDto)
+      const duplicate = this.find_Duplicate(createTaskDto,()=>tasks.length++)
       if(duplicate){
         throw new ConflictException('Task with this title already exists')
       }
@@ -59,35 +53,26 @@ export class TasksService {
      
     //Filter
     if(query.completed !== undefined){
-      if(typeof query.completed !== 'boolean'){
-        throw new BadRequestException('Completed must be boolean')
-      }
       result = result.filter(task=> task.completed === query.completed)
     }    
 
     //Search
     const search = query.search
     if(search!== undefined){
-      if(typeof search !== 'string' || search.trim() === ''){
-        throw new BadRequestException('Search must be a non-empty string')
-      }
       result = result.filter(task=> task.title.toLowerCase().includes(search.toLowerCase()))
     }
 
     //Sorting
     if(query.sortBy !== undefined && query.sortOrder !== undefined){
-      if(typeof query.sortBy !== 'string' || !['createdAt','title','id'].includes(query.sortBy)){
-        throw new BadRequestException('sortBy must be one of createdAt, title, id')
-      }
-      const sortBy = query.sortBy ?? 'createdAt'
-      const sortOrder = query.sortOrder  ?? 'desc'
+      const sortBy = query.sortBy
+      const sortOrder = query.sortOrder
     
       result.sort((a,b)=> {
         const valueA = a[sortBy];
         const valueB = b[sortBy];
 
         if(valueA>valueB){
-          return sortOrder === 'desc' ? 1: -1
+          return sortOrder === 'asc' ? 1: -1
         }
 
         if(valueA<valueB){
@@ -99,16 +84,10 @@ export class TasksService {
     }
     //Pagination
     if(query.page !== undefined && query.limit !== undefined){
-      if(typeof query.page !== 'number' || query.page < 1){
-      throw new BadRequestException('Page must be a number greater than 0')
-      }
-      if(typeof query.limit !== 'number' || query.limit < 1 || query.limit > 100){
-      throw new BadRequestException('Limit must be a number between 1 and 100')
-      }
-      const page = query.page
+      const page = query.page 
       const limit = query.limit
 
-      const total = tasks.length
+      const total = tasks.filter(task=> task.deletedAt == null).length
       const totalPages = Math.ceil(total/limit)
 
       const start = (page -1)*limit;
@@ -150,7 +129,7 @@ export class TasksService {
       throw new NotFoundException('Task not found')
     }
 
-    if(this.find_Duplicate(putupdateTaskDto)){
+    if(this.find_Duplicate(putupdateTaskDto,id)){
         throw new ConflictException('Task with this title already exists')
     }
 
@@ -172,7 +151,7 @@ export class TasksService {
     }
 
     if(patchupdateTaskDto.title !== undefined){
-      if(this.find_Duplicate(patchupdateTaskDto)){
+      if(this.find_Duplicate(patchupdateTaskDto,id)){
         throw new ConflictException('Task with this title already exists')
       }
       task.title= patchupdateTaskDto.title.trim()

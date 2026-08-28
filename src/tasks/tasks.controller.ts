@@ -64,7 +64,7 @@ export class TasksController {
   @ApiNotFoundResponse({
     description: 'Task not found or task has been deleted',
   })
-  PUTupdate(@Param('id') id: number, @Body() putupdateTaskDto: PutUpdateTaskDto){
+  PUTupdate(@Param('id',ParseIntPipe) id: number, @Body() putupdateTaskDto: PutUpdateTaskDto){
     return this.tasksService.PUTupdate(+id, putupdateTaskDto);
   }
 
@@ -79,7 +79,7 @@ export class TasksController {
   @ApiNotFoundResponse({
     description: 'Task not found or task has been deleted',
   })
-  PATCHupdate(@Param('id') id: number, @Body() patchupdateTaskDto: PatchUpdateTaskDto) {
+  PATCHupdate(@Param('id',ParseIntPipe) id: number, @Body() patchupdateTaskDto: PatchUpdateTaskDto) {
     return this.tasksService.PATCHupdate(+id, patchupdateTaskDto);
   }
 
@@ -93,7 +93,7 @@ export class TasksController {
   @ApiNotFoundResponse({
   description: 'Task not found or task has already been deleted',
   })
-  remove(@Param('id') id: number) {
+  remove(@Param('id',ParseIntPipe) id: number) {
     return this.tasksService.remove(+id);
   }
 }
