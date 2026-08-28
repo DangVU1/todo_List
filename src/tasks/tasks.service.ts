@@ -20,7 +20,6 @@ export class TasksService {
   create(createTaskDto: CreateTaskDto) {
     
     if(createTaskDto.title !== undefined){
-
       const duplicate = this.find_Duplicate(createTaskDto,()=>tasks.length++)
       if(duplicate){
         throw new ConflictException('Task with this title already exists')
@@ -65,15 +64,15 @@ export class TasksService {
 
     //Sorting
     if(query.sortBy !== undefined && query.sortOrder !== undefined){
-      const sortBy = query.sortBy ?? 'createdAt'
-      const sortOrder = query.sortOrder  ?? 'desc'
+      const sortBy = query.sortBy
+      const sortOrder = query.sortOrder
     
       result.sort((a,b)=> {
         const valueA = a[sortBy];
         const valueB = b[sortBy];
 
         if(valueA>valueB){
-          return sortOrder === 'desc' ? 1: -1
+          return sortOrder === 'asc' ? 1: -1
         }
 
         if(valueA<valueB){
