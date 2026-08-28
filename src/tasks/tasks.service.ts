@@ -7,8 +7,9 @@ import { GetTasksQueryDto } from './dto/query-task.dto';
 @Injectable()
 export class TasksService { 
   //Suport function
-  find_Duplicate(taskdto){
-    return tasks.find(task=>task.title.trim().toLowerCase() === taskdto.title?.trim().toLowerCase())
+  find_Duplicate(taskdto,id){
+    const result = tasks.filter(task=> task.deletedAt == null && task.id !== id )
+    return result.find(task=>task.title.trim().toLowerCase() === taskdto.title?.trim().toLowerCase())
   }
 
   find_ID(id){
@@ -20,7 +21,7 @@ export class TasksService {
     
     if(createTaskDto.title !== undefined){
 
-      const duplicate = this.find_Duplicate(createTaskDto)
+      const duplicate = this.find_Duplicate(createTaskDto,()=>tasks.length++)
       if(duplicate){
         throw new ConflictException('Task with this title already exists')
       }
@@ -129,7 +130,7 @@ export class TasksService {
       throw new NotFoundException('Task not found')
     }
 
-    if(this.find_Duplicate(putupdateTaskDto)){
+    if(this.find_Duplicate(putupdateTaskDto,id)){
         throw new ConflictException('Task with this title already exists')
     }
 
@@ -151,7 +152,7 @@ export class TasksService {
     }
 
     if(patchupdateTaskDto.title !== undefined){
-      if(this.find_Duplicate(patchupdateTaskDto)){
+      if(this.find_Duplicate(patchupdateTaskDto,id)){
         throw new ConflictException('Task with this title already exists')
       }
       task.title= patchupdateTaskDto.title.trim()
