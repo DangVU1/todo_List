@@ -19,13 +19,7 @@ export class TasksService {
   create(createTaskDto: CreateTaskDto) {
     
     if(createTaskDto.title !== undefined){
-      if(typeof createTaskDto.title !== 'string' ){
-        throw new BadRequestException('Title is a string and >= 1 <= 100')
-      }
 
-      if(typeof createTaskDto.completed !== 'boolean'){
-        throw new BadRequestException('Completed must be boolean')
-      }
       const duplicate = this.find_Duplicate(createTaskDto)
       if(duplicate){
         throw new ConflictException('Task with this title already exists')
