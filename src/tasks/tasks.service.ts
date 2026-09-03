@@ -47,7 +47,8 @@ export class TasksService {
     }
     return this.prisma.task.create({
       data: {
-        title: createTaskDto.title
+        title: createTaskDto.title,
+        completed: createTaskDto.completed
       }
     })
   }
