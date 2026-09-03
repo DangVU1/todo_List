@@ -14,6 +14,9 @@ export class TasksService {
       id: task.id,
       title: task.title,
       completed: task.completed,
+      createdAt: task.createdAt,
+      updatedAt: task.updatedAt,
+      deletedAt: task.deletedAt
     };
   }
 
