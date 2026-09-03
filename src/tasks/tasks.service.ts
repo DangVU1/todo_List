@@ -1,179 +1,156 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateTaskDto } from './dto/create-task.dto';
-import { PutUpdateTaskDto,PatchUpdateTaskDto } from './dto/update-task.dto';
-import { tasks } from './tasks.data';
+import { PutUpdateTaskDto, PatchUpdateTaskDto } from './dto/update-task.dto';
+import { PrismaService } from '../prisma/prisma.service';
 import { GetTasksQueryDto } from './dto/query-task.dto';
+import {Task} from '@prisma/client'
 
 @Injectable()
-export class TasksService { 
-  //Suport function
-  find_Duplicate(taskdto,id){
-    const result = tasks.filter(task=> task.deletedAt == null && task.id !== id )
-    return result.find(task=>task.title.trim().toLowerCase() === taskdto.title?.trim().toLowerCase())
+export class TasksService {
+  constructor(private readonly prisma: PrismaService) { }
+
+  private toResponse(task: Task) {
+    return {
+      id: task.id,
+      title: task.title,
+      completed: task.completed,
+    };
   }
 
-  find_ID(id){
-    return tasks.find(i => i.id==id)
+  async find_Duplicate(taskdto, id?) {
+    const duplicate = await this.prisma.task.findFirst({
+      where: {
+        deletedAt: null,
+        title: { equals: taskdto.title.trim(), mode: 'insensitive' },
+        ...(id && { NOT: { id: id } }),
+      },
+    });
+    return duplicate
+  }
+
+  async find_Id(id) {
+    const task = await this.prisma.task.findFirst({
+      where: {
+        id,
+        deletedAt: null
+      }
+    })
+    return task
   }
 
   //POST /tasks
-  create(createTaskDto: CreateTaskDto) {
-    
-    if(createTaskDto.title !== undefined){
-      const duplicate = this.find_Duplicate(createTaskDto,()=>tasks.length++)
-      if(duplicate){
-        throw new ConflictException('Task with this title already exists')
-      }
-      
+  async create(createTaskDto: CreateTaskDto) {
+    const duplicate = await this.find_Duplicate(createTaskDto, undefined)
 
-      let nextID = tasks.length
-      const new_Data = {
-        id: nextID++,
-        title: createTaskDto.title.trim(),
-        completed: createTaskDto.completed ?? false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        deletedAt: null
+    if (duplicate) {
+      throw new ConflictException('Task title already exists');
+    }
+    return this.prisma.task.create({
+      data: {
+        title: createTaskDto.title
       }
-
-      tasks.push(new_Data);
-      return new_Data
-    }
-    else {
-      throw new BadRequestException('Title is required')
-    }
+    })
   }
 
   //GET /tasks
-  findAll(query: GetTasksQueryDto) {
-    let result = tasks;
+  async findAll(query: GetTasksQueryDto) {
+    const page = query.page ?? 1;
+    const sortBy = query.sortBy ?? 'createdAt';
+    const sortOrder = query.sortOrder ?? 'desc';
+    const limit = query.limit ?? 5;
 
-    //Exclude deletedAt !== null
-    result = result.filter(task=> task.deletedAt == null)
-     
-    //Filter
-    if(query.completed !== undefined){
-      result = result.filter(task=> task.completed === query.completed)
-    }    
+    const where = {
+      deletedAt: null,
+      ...(query.completed !== undefined && { completed: query.completed }),
+      ...(query.search !== undefined && {
+        title: { contains: query.search, mode: 'insensitive' as const },
+      }),
+    };
 
-    //Search
-    const search = query.search
-    if(search!== undefined){
-      result = result.filter(task=> task.title.toLowerCase().includes(search.toLowerCase()))
-    }
+    const total = await this.prisma.task.count({ where });
 
-    //Sorting
-    if(query.sortBy !== undefined && query.sortOrder !== undefined){
-      const sortBy = query.sortBy
-      const sortOrder = query.sortOrder
-    
-      result.sort((a,b)=> {
-        const valueA = a[sortBy];
-        const valueB = b[sortBy];
+    const data = await this.prisma.task.findMany({
+      where,
+      orderBy: { [sortBy]: sortOrder },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
 
-        if(valueA>valueB){
-          return sortOrder === 'asc' ? 1: -1
-        }
-
-        if(valueA<valueB){
-          return sortOrder === 'asc' ? -1: 1
-        }
-
-        return 0;
-      });
-    }
-    //Pagination
-    if(query.page !== undefined && query.limit !== undefined){
-      const page = query.page 
-      const limit = query.limit
-
-      const total = tasks.filter(task=> task.deletedAt == null).length
-      const totalPages = Math.ceil(total/limit)
-
-      const start = (page -1)*limit;
-      const end = start + limit;
-      const data = result.slice(start,end)
-    
-      return {
-        data,
-        meta:{
-          page,
-          limit,
-          total,
-          totalPages
-        }
-      };
-    }
-    
-    return result;
+    return {
+      data: data.map(this.toResponse),
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   //GET /tasks/:id
-  findOne(id: number) {
-    const result = tasks.find(i=> i.id == id)
+  async findOne(id: number) {
+    const task = await this.find_Id(id)
 
-    if(!result || result.deletedAt !== null){
-      throw new NotFoundException('Task not found')
+    if (!task) {
+      throw new NotFoundException('Task not found');
     }
-    return result;
+    return task
   }
 
   //PUT /tasks/:id
-  PUTupdate(id: number, putupdateTaskDto: PutUpdateTaskDto) {
-    if(putupdateTaskDto.title == undefined || putupdateTaskDto.completed == undefined){
-      throw new BadRequestException('Missing title or completed')
+  async PUTupdate(id: number, putupdateTaskDto: PutUpdateTaskDto) {
+    const task = await this.find_Id(id)
+    if (!task) {
+      throw new NotFoundException('Task not found');
     }
 
-    const task = this.find_ID(id)
-    if(!task || task.deletedAt !== null){
-      throw new NotFoundException('Task not found')
+    const duplicate = await this.find_Duplicate(putupdateTaskDto, id)
+    if (duplicate) {
+      throw new ConflictException('Task with this title already exists')
     }
 
-    if(this.find_Duplicate(putupdateTaskDto,id)){
-        throw new ConflictException('Task with this title already exists')
-    }
-
-    task.title = putupdateTaskDto.title.trim()
-    task.completed = putupdateTaskDto.completed
-    task.updatedAt = new Date().toISOString()
-    return task
+    return this.prisma.task.update({
+      where: {
+        id: id
+      },
+      data: {
+        title: putupdateTaskDto.title,
+        completed: putupdateTaskDto.completed,
+      }
+    })
   }
 
   //PATCH /tasks/:id
-  PATCHupdate(id: number, patchupdateTaskDto: PatchUpdateTaskDto) {
-    if(patchupdateTaskDto.title == undefined && patchupdateTaskDto.completed == undefined){
-      throw new BadRequestException('Missing title or completed')
+  async PATCHupdate(id: number, patchupdateTaskDto: PatchUpdateTaskDto) {
+    const task = await this.find_Id(id)
+    if (!task) {
+      throw new NotFoundException('Task not found');
     }
 
-    const task = this.find_ID(id)
-    if(!task || task.deletedAt !== null){
-      throw new NotFoundException('Task not found')
-    }
-
-    if(patchupdateTaskDto.title !== undefined){
-      if(this.find_Duplicate(patchupdateTaskDto,id)){
+    if (patchupdateTaskDto.title !== undefined) {
+      const duplicate = await this.find_Duplicate(patchupdateTaskDto, id)
+      
+      if (duplicate) {
         throw new ConflictException('Task with this title already exists')
       }
-      task.title= patchupdateTaskDto.title.trim()
     }
 
-    if(patchupdateTaskDto.completed !== undefined){
-      task.completed = patchupdateTaskDto.completed
-    }
-    
-    task.updatedAt = new Date().toISOString()
-
-    return task
+    return this.prisma.task.update({
+      where: {
+        id: id
+      },
+      data: {
+        ...(patchupdateTaskDto.title !== undefined && { title: patchupdateTaskDto.title }),
+        ...(patchupdateTaskDto.completed !== undefined && { completed: patchupdateTaskDto.completed }),
+      }
+    })
   }
 
-  remove(id: number) {
-    const task = this.find_ID(id)
-    
-    if(!task || task.deletedAt !== null){
-      throw new NotFoundException('Task not found')
+  async remove(id: number) {
+    const task = await this.find_Id(id)
+    if (!task) {
+      throw new NotFoundException('Task not found');
     }
 
-    task.deletedAt = new Date().toISOString()
+    await this.prisma.task.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
 
     return {
       "message": "Task deleted"

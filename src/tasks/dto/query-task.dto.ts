@@ -1,6 +1,6 @@
-import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger"
+import { ApiPropertyOptional } from "@nestjs/swagger"
 import { Transform, Type } from "class-transformer"
-import { IsOptional,IsString, Min,IsBoolean,IsIn, Max, IsInt } from "class-validator"
+import { IsOptional,IsString, Min,IsBoolean,IsIn, Max, IsInt, IsNotEmpty } from "class-validator"
 
 export class GetTasksQueryDto {
     @Type(()=>Number)
@@ -10,7 +10,7 @@ export class GetTasksQueryDto {
     @ApiPropertyOptional({
         example: 1,
     })
-    page: number= 1
+    page?: number 
 
     @IsOptional()
     @Min(1)
@@ -20,7 +20,7 @@ export class GetTasksQueryDto {
     @ApiPropertyOptional({
         example: 5,
     })
-    limit: number  = 5
+    limit?: number
 
     
     @IsOptional()
@@ -37,16 +37,17 @@ export class GetTasksQueryDto {
     @IsOptional()
     @IsIn(['createdAt','title','id'])
     @ApiPropertyOptional()
-    sortBy: string = 'createdAt'
+    sortBy?: string
 
     @IsOptional()
     @IsString()
     @IsIn(['desc','asc'])
     @ApiPropertyOptional()
-    sortOrder: string ='desc'  
+    sortOrder?: 'desc' |  'asc'
 
     @IsString()
     @IsOptional()
+    @IsNotEmpty()
     @ApiPropertyOptional()
     search?: string
 }
